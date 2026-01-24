@@ -47,16 +47,6 @@ public class Location {
         return country;
     }
 
-    @Override
-    public String toString() {
-        return "Location{" +
-                "latitude=" + latitude +
-                ", longitude=" + longitude +
-                ", name='" + name + '\'' +
-                ", elevation=" + elevation +
-                ", country_code='" + country_code + '\'' +
-                ", country='" + country + '\'' +
-                '}';
-    }
+
 }
 
