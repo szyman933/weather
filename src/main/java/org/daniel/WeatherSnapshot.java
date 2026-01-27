@@ -72,7 +72,7 @@ public class WeatherSnapshot {
 
     @Override
     public String toString() {
-        return "WeatherSnapshot{" +
+        return " WeatherSnapshot{" +
                 "latitude=" + latitude +
                 ", longitude=" + longitude +
                 ", current=" + current +

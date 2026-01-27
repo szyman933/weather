@@ -4,10 +4,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.NonNull;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -19,6 +21,10 @@ public class Main {
     static public final String WEATHERAPI = "https://api.open-meteo.com/v1/forecast?";
     static public final String WEATHERHISTORICAL = "https://api.open-meteo.com/v1/forecast?latitude=54.3523&longitude=18.6491&hourly=temperature_2m&timezone=Europe%2FMoscow&past_days=2&forecast_days=1";
 
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final Scanner SCANNER = new Scanner(System.in);
+    private static final HttpClient CLIENT = HttpClient.newHttpClient();
+
 
     private static HttpURLConnection connection;
     static int i = 0;
@@ -29,7 +35,7 @@ public class Main {
         Location city;
         WeatherSnapshot weather;
         List<WeatherSnapshot> snapshots = new ArrayList<>();
-        int command;
+
 
         do {
 
@@ -43,9 +49,8 @@ public class Main {
             );
 
 
-            Scanner scanner = new Scanner(System.in);
-            int option = scanner.nextInt();
-            scanner.nextLine();
+            int option = SCANNER.nextInt();
+            SCANNER.nextLine();
 
             switch (option) {
                 case 1:
@@ -55,7 +60,7 @@ public class Main {
                     break;
                 case 2:
                     System.out.print("Enter city name to get actual temperature:");
-                    String newCity = scanner.nextLine();
+                    String newCity = SCANNER.nextLine();
                     System.out.println("You typed: " + newCity);
                     city = getLocation(newCity);
                     System.out.println(city.name + " longitude: " + city.longitude + " latitude: " + city.latitude + " country: " + city.country);
@@ -64,16 +69,18 @@ public class Main {
                     break;
                 case 3:
                     System.out.print("How long should I gather data in minutes?\n");
-                    System.out.print("Warning! Everything less than 30 minutes doesn't make sens because API data refresh interval is 15minutes\n");
-                    double stop = scanner.nextDouble();
-                    scanner.nextLine();
+                    System.out.print("Warning! Everything less than 15 minutes doesn't make sens because API data refresh interval is 15minutes\n");
+                    double stop = SCANNER.nextDouble();
+                    SCANNER.nextLine();
                     Location finalCity = getLocation(cityname);
                     //starting periodic task for collecting the temp measurements
                     final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
                     final CountDownLatch latch = new CountDownLatch(1);
 
                     executor.scheduleAtFixedRate(() -> {
-                        System.out.println(++i);
+
+                        System.out.print(++i);
+
                         snapshots.add(getWeather(finalCity));
                         if (i > stop) {
                             latch.countDown();
@@ -114,64 +121,24 @@ public class Main {
     }
 
     public static String getResponse(String destination) {
-        HttpURLConnection connection = null;
-        BufferedReader reader;
-        String line;
-        StringBuilder responseContent = new StringBuilder();
-
+        HttpRequest request = HttpRequest.newBuilder().uri(URI.create(destination)).timeout(Duration.ofSeconds(30)).GET().build();
         try {
-
-            URL url = new URL(destination);
-            connection = (HttpURLConnection) url.openConnection();
-
-            connection.setRequestMethod("GET");
-            connection.setConnectTimeout(90000);
-            connection.setReadTimeout(90000);
-
-
-            int status = connection.getResponseCode();
-            // System.out.println(status);
-
-            if (status > 299) {
-
-                reader = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-                while ((line = reader.readLine()) != null) {
-                    responseContent.append(line);
-                }
-                reader.close();
-            } else {
-
-                reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
-                while ((line = reader.readLine()) != null) {
-                    responseContent.append(line);
-                }
-
-            }
-
-            //  System.out.println(responseContent.toString());
-
+            return CLIENT.send(request, HttpResponse.BodyHandlers.ofString()).body();
         } catch (Exception e) {
-            e.printStackTrace();
-        } finally {
-            connection.disconnect();
+            throw new RuntimeException(e);
         }
-
-
-        return responseContent.toString();
 
     }
 
     public static Location getLocation(String cityName) {
 
 
-        ObjectMapper objectMapper = new ObjectMapper();
-
         String response = getResponse(GEOAPI + cityName);
 
         GeoResponse loc;
         List<Location> locList;
         try {
-            loc = objectMapper.readValue(response, GeoResponse.class);
+            loc = MAPPER.readValue(response, GeoResponse.class);
 
             locList = loc.getResults();
 
@@ -193,14 +160,12 @@ public class Main {
     public static WeatherSnapshot getWeather(@NonNull Location desiredLocation) {
 
 
-        ObjectMapper objectMapper = new ObjectMapper();
-
         String response = getResponse(WEATHERAPI + "latitude=" + desiredLocation.getLatitude() + "&longitude=" + desiredLocation.getLongitude() + "&current=temperature_2m");
 
 
         WeatherSnapshot ws = null;
         try {
-            ws = objectMapper.readValue(response, WeatherSnapshot.class);
+            ws = MAPPER.readValue(response, WeatherSnapshot.class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
@@ -210,44 +175,29 @@ public class Main {
 
     public static String calculateTrend(List<Double> list) {
 
-        double[] table = new double[list.size()];
-
-        for (int i = 0; i < list.size(); i++) {
-            table[i] = list.get(i);
-        }
-
-        int n = table.length;
+        int n = list.size();
         double sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-
         for (int i = 0; i < n; i++) {
+            double y = list.get(i);
             sumX += i;
-            sumY += table[i];
-            sumXY += i * table[i];
+            sumY += y;
+            sumXY += i * y;
             sumXX += i * i;
         }
-
         double slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+        if (slope > 0) return "Getting warmer";
+        if (slope < 0) return "Getting colder";
+        return "No change";
 
-        if (slope > 0) {
-            return "Getting warmer";
-        } else if (slope < 0) {
-            return "Getting colder";
-        } else if (slope == 0) {
-            return "No change";
-        }
-
-        return "Something went wrong! try again";
     }
 
     public static WeatherHistorical getWeatherHistoricalData() {
 
-        ObjectMapper objectMapper = new ObjectMapper();
-
         String responseApi = getResponse(WEATHERHISTORICAL);
 
-        WeatherHistorical ws = null;
+        WeatherHistorical ws;
         try {
-            ws = objectMapper.readValue(responseApi, WeatherHistorical.class);
+            ws = MAPPER.readValue(responseApi, WeatherHistorical.class);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
         }
