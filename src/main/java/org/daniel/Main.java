@@ -25,17 +25,13 @@ public class Main {
     private static final Scanner SCANNER = new Scanner(System.in);
     private static final HttpClient CLIENT = HttpClient.newHttpClient();
 
-
     private static HttpURLConnection connection;
-    static int i = 0;
     static String cityname = "Gdansk";
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
 
         Location city;
         WeatherSnapshot weather;
-        List<WeatherSnapshot> snapshots = new ArrayList<>();
-
 
         do {
 
@@ -70,33 +66,24 @@ public class Main {
                 case 3:
                     System.out.print("How long should I gather data in minutes?\n");
                     System.out.print("Warning! Everything less than 15 minutes doesn't make sens because API data refresh interval is 15minutes\n");
-                    double stop = SCANNER.nextDouble();
+                    int stop = SCANNER.nextInt();
                     SCANNER.nextLine();
                     Location finalCity = getLocation(cityname);
-                    //starting periodic task for collecting the temp measurements
-                    final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-                    final CountDownLatch latch = new CountDownLatch(1);
 
-                    executor.scheduleAtFixedRate(() -> {
-
-                        System.out.print(++i);
-
-                        snapshots.add(getWeather(finalCity));
-                        if (i > stop) {
-                            latch.countDown();
-                        }
-                    }, 0, 1, TimeUnit.MINUTES);
-
-                    try {
-                        latch.await();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                    executor.shutdownNow();
-                    // calculating trend
                     List<Double> data = new ArrayList<>();
-                    snapshots.stream().forEach(o -> data.add(o.getCurrent().getTemperature2m()));
+
+                    for (int a = 0; a < stop; a++) {
+
+                        System.out.println(a);
+                        double temp = getWeather(finalCity).getCurrent().getTemperature2m();
+                        data.add(temp);
+                        System.out.print(temp);
+                        Thread.sleep(60000);
+
+                    }
+
                     System.out.println(calculateTrend(data));
+
                     break;
                 case 4:
 
@@ -133,7 +120,7 @@ public class Main {
     public static Location getLocation(String cityName) {
 
 
-        String response = getResponse(GEOAPI + cityName);
+        String response = getResponse(GEOAPI + cityName.replace(" ","+"));
 
         GeoResponse loc;
         List<Location> locList;
