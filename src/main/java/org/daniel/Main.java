@@ -52,7 +52,7 @@ public class Main {
                 case 1:
                     city = getLocation(cityname);
                     weather = getWeather(city);
-                    System.out.println("Temperature for city " + city.name + " is :" + weather.getCurrent().getTemperature2m());
+                    System.out.println("Temperature for city " + city.name + " is :" + weather.getCurrent().getTemperature2m() + weather.getCurrentUnits().getTemperature2m());
                     break;
                 case 2:
                     System.out.print("Enter city name to get actual temperature:");
@@ -61,23 +61,23 @@ public class Main {
                     city = getLocation(newCity);
                     System.out.println(city.name + " longitude: " + city.longitude + " latitude: " + city.latitude + " country: " + city.country);
                     weather = getWeather(city);
-                    System.out.println("Temperature for city " + city.name + " is :" + weather.getCurrent().getTemperature2m());
+                    System.out.println("Temperature for city " + city.name + " is :" + weather.getCurrent().getTemperature2m() + weather.getCurrentUnits().getTemperature2m());
                     break;
                 case 3:
                     System.out.print("How long should I gather data in minutes?\n");
-                    System.out.print("Warning! Everything less than 15 minutes doesn't make sens because API data refresh interval is 15minutes\n");
+                    System.out.print("Warning! Everything less than 15 minutes doesn't make sense because API data refresh interval is 15 minutes\n");
                     int stop = SCANNER.nextInt();
                     SCANNER.nextLine();
                     Location finalCity = getLocation(cityname);
 
                     List<Double> data = new ArrayList<>();
-
+                    System.out.println("Collecting data. Please wait !");
                     for (int a = 0; a < stop; a++) {
 
-                        System.out.println(a);
+                        //System.out.println(a);
                         double temp = getWeather(finalCity).getCurrent().getTemperature2m();
                         data.add(temp);
-                        System.out.print(temp);
+                        //System.out.print(temp);
                         Thread.sleep(60000);
 
                     }
